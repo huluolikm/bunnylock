@@ -20,22 +20,25 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 2. 配置 Android SDK
+      # 2. 配置 Android SDK (修复了 tools 包找不到的报错)
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       # 3. 安装作者指定的 NDK (29.0.14206865) 和 CMake (3.22.1)
+      # 加了 yes | 确保自动同意协议，不会卡住
       - name: Install NDK and CMake
         run: |
-          sdkmanager "ndk;29.0.14206865"
-          sdkmanager "cmake;3.22.1"
+          yes | sdkmanager "ndk;29.0.14206865"
+          yes | sdkmanager "cmake;3.22.1"
 
       # 4. 赋予执行权限
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # 5. 直接执行作者 README 里的编译命令
-      # 因为源码没有 keystore.properties，它会自动用 debug 密钥签名，可直接安装
+      # 5. 编译 Release APK
+      # 源码没有配置 keystore，会自动用 debug 签名，能直接安装
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
@@ -44,5 +47,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bunnylock-release
-          # 产物默认在 app/build/outputs/apk/release/ 目录下
           path: app/build/outputs/apk/release/*.apk
