@@ -20,14 +20,22 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # 2. 配置 Android SDK (修复了 tools 包找不到的报错)
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools'
+      # 2. 直接从 Google 官方下载并配置 Android cmdline-tools (拒绝第三方 Action)
+      - name: Setup Android SDK (Official Google Download)
+        run: |
+          # 从 dl.google.com 下载官方最新的 cmdline-tools
+          curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip
+          # 建立目录并解压
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+          # 将官方 sdkmanager 写入环境变量
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          # 自动接受官方许可协议
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       # 3. 安装作者指定的 NDK (29.0.14206865) 和 CMake (3.22.1)
-      # 加了 yes | 确保自动同意协议，不会卡住
+      # 此时用的就是上一步从官方拉取的 sdkmanager
       - name: Install NDK and CMake
         run: |
           yes | sdkmanager "ndk;29.0.14206865"
@@ -38,7 +46,6 @@ jobs:
         run: chmod +x ./gradlew
 
       # 5. 编译 Release APK
-      # 源码没有配置 keystore，会自动用 debug 签名，能直接安装
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
