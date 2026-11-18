@@ -1,55 +1,63 @@
+
 name: Build bunnylock
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # 允许你在 Actions 页面手动点击运行
+  workflow_dispatch:
+
+# 最小权限：只允许读取仓库内容
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 拉取源码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. 配置 Java 环境 (Gradle 运行用)
+      # 2. 验证 Gradle Wrapper JAR 官方 SHA-256
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v6
+
+      # 3. 配置 Java 环境
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      # 2. 直接从 Google 官方下载并配置 Android cmdline-tools (拒绝第三方 Action)
+      # 4. 从 Google 官方下载 Android SDK Command-line Tools
       - name: Setup Android SDK (Official Google Download)
         run: |
-          # 从 dl.google.com 下载官方最新的 cmdline-tools
           curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip
-          # 建立目录并解压
+
           mkdir -p $ANDROID_HOME/cmdline-tools
           unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
           mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          # 将官方 sdkmanager 写入环境变量
+
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          # 自动接受官方许可协议
+
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      # 3. 安装作者指定的 NDK (29.0.14206865) 和 CMake (3.22.1)
-      # 此时用的就是上一步从官方拉取的 sdkmanager
+      # 5. 安装指定版本 NDK 和 CMake
       - name: Install NDK and CMake
         run: |
           yes | sdkmanager "ndk;29.0.14206865"
           yes | sdkmanager "cmake;3.22.1"
 
-      # 4. 赋予执行权限
+      # 6. 赋予 Gradle Wrapper 执行权限
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # 5. 编译 Release APK
+      # 7. 编译 Release APK
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
-      # 6. 上传生成的 APK
+      # 8. 上传生成的 APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
